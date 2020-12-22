@@ -6,7 +6,7 @@
 
       <div>
         <label class="apiLabel" for="api">API:</label>
-        <input name="api" type="text" v-model="api" />
+        <input name="api" type="text" v-model="api"  @change="changedAPI"/>
       </div>
 
       <button class="sendBtn">Send Selection</button>
@@ -26,9 +26,6 @@
 <script>
 export default {
   name: "ImageCropper",
-  props: {
-    //st: String
-  },
   data(){
     return {
       api: "https://dummyimage.com/wsvga",
@@ -46,16 +43,18 @@ export default {
   methods: {
     newImg(){
       this.axios.get(this.api, { responseType: 'arraybuffer' }).then((response) => {
-        let foo = Buffer.from(response.data, 'binary').toString('base64')
-        this.imgData = "data:image/png;base64,"+foo;
+        let imgDat = Buffer.from(response.data, 'binary').toString('base64')
+        this.imgData = "data:image/png;base64,"+imgDat;
+        this.instructionStep = 2;
       })
     },
-
+    changedAPI(){
+      this.instructionStep = 1;
+    }
   }
 };
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped lang="scss">
 .cropperContainer {
   .imageview{
