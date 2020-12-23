@@ -23,10 +23,10 @@
 
     <div class="imageview">
       <div class="imgContainer">
-        <img :src="imgData" v-show="Object.keys(imgData).length > 0" :style="'transform: scale('+zoom+') translate('+offsetX+'px, '+offsetY+'px);'" />
+        <img ref="imgRef" :src="imgData" v-show="Object.keys(imgData).length > 0" :style="'transform: scale('+zoom+') translate('+offsetX+'px, '+offsetY+'px);'" />
       </div>
 
-      <vue-draggable-resizable :w="256" :h="256" :resizable="true" @dragging="onDrag" @resizing="onResize" :parent="true" class="regionBox" v-if="instructionStep>1"></vue-draggable-resizable>
+      <vue-draggable-resizable :key="regionKey" :w="defaultCropping.width" :h="defaultCropping.height" :resizable="true" @dragging="onDrag" @resizing="onResize" :parent="true" class="regionBox" v-if="instructionStep>1"></vue-draggable-resizable>
 
       <div class="scaleControls" v-if="instructionStep>1">
         <div class="scaleControlsRow">
@@ -62,6 +62,12 @@ export default {
     VueDraggableResizable
   },
   data(){
+    let dCrop = {
+      'x': 0,
+      'y': 0,
+      'width': 256,
+      'height': 256
+    }
     return {
       api: "http://localhost:5000/",
       imgData: {},
@@ -78,25 +84,35 @@ export default {
       offsetY: 0,
       regionX: 0,
       regionY: 0,
-      regionWidth: 256,
-      regionHeight: 256,
+      regionWidth: dCrop.width,
+      regionHeight: dCrop.height,
+      regionKey: 0,
+      defaultCropping: dCrop
     }
   },
   methods: {
-    onResize: function (x, y, width, height) {
+    onResize(x, y, width, height) {
       this.regionX = x
       this.regionY = y
       this.regionWidth = width
       this.regionHeight = height
     },
-    onDrag: function (x, y) {
+    onDrag(x, y) {
       this.regionX = x
       this.regionY = y
     },
-    newImg(){
+    resetView(){
       this.zoom = 1;
       this.offsetX = 0;
       this.offsetY = 0;
+      this.regionX = this.defaultCropping.x;
+      this.regionY = this.defaultCropping.y;
+      this.regionWidth = this.defaultCropping.width;
+      this.regionHeight = this.defaultCropping.height;
+      this.regionKey++;
+    },
+    newImg(){
+      this.resetView();
 
       this.axios.get(this.api).then((response) => {
         let imgURL = this.api;
@@ -118,19 +134,44 @@ export default {
     nextBtnClicked(){
       this.instructionStep++;
     },
+    croppingIsDefault(cropping){
+      if(
+        cropping.x == this.defaultCropping.x
+        && cropping.y == this.defaultCropping.y
+        && cropping.width == this.defaultCropping.width
+        && cropping.height == this.defaultCropping.height
+      ){
+        return true
+      }
+      return false
+    },
+    cropIsValid(cropping){
+      if(cropping.x < 0
+        || cropping.y < 0
+        || (cropping.x+cropping.width) > this.$refs.imgRef.width
+        || (cropping.y+cropping.height) > this.$refs.imgRef.height
+        || this.croppingIsDefault(cropping)
+      ){
+        return false
+      }
+
+      return true
+    },
     sendSelection(){
-      if(this.imgUrl == "" ){
+      let postData = {
+        x: Math.round( this.regionX*(1/this.zoom) - this.offsetX*(this.zoom) ),
+        y: Math.round( this.regionY*(1/this.zoom) - this.offsetY*(this.zoom) ),
+        width: Math.round( this.regionWidth*(1/this.zoom) ),
+        height: Math.round( this.regionHeight*(1/this.zoom) )
+      }
+
+      if(this.imgUrl == "" || !this.cropIsValid(postData)){
         return;
       }
       this.axios({
         method: 'post',
         url: this.imgUrl,
-        data: {
-          x: Math.round( this.regionX*(1/this.zoom) - this.offsetX*(this.zoom) ),
-          y: Math.round( this.regionY*(1/this.zoom) - this.offsetY*(this.zoom) ),
-          width: Math.round( this.regionWidth*(1/this.zoom) ),
-          height: Math.round( this.regionHeight*(1/this.zoom) )
-        }
+        data: postData
       }).then((response) => {
         if(response.status == 200){
           this.newImg();
